@@ -1,0 +1,9 @@
+name = "tea-store-r2-upload"
+main = "src/index.js"
+compatibility_date = "2026-02-10"
+
+# Create this bucket in Cloudflare R2 first, then keep the same binding name.
+[[r2_buckets]]
+binding = "PRODUCT_IMAGES"
+bucket_name = "tea-store-product-images"
+

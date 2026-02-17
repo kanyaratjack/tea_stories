@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter iPad (Release)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "release",
+      "args": [
+        "-d",
+        "00008030-0011546C02BA202E"
+      ]
+    },
+    {
+      "name": "Flutter iPad (Debug)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "debug",
+      "args": [
+        "-d",
+        "00008030-0011546C02BA202E"
+      ]
+    }
+  ]
+}
