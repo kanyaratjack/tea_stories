@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tea Store Web Admin</title>
+  <style>
+    :root { --bg:#f6f8fb; --card:#fff; --line:#e6e9ef; --text:#1f2937; --muted:#6b7280; --blue:#2563eb; --green:#2e7d32; --red:#c62828; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--text); background:var(--bg); }
+    .wrap { max-width:1100px; margin:20px auto; padding:0 12px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    input, select, button { height:36px; border:1px solid var(--line); border-radius:8px; padding:0 10px; background:#fff; }
+    input { min-width:220px; }
+    button { cursor:pointer; }
+    button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { border-bottom:1px solid var(--line); padding:10px 8px; text-align:left; white-space:nowrap; }
+    th { color:var(--muted); font-weight:600; }
+    .muted { color:var(--muted); }
+    .badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:600; }
+    .paid { background:#e8f5e9; color:var(--green); }
+    .partial { background:#fff8e1; color:#a16207; }
+    .refunded { background:#ffebee; color:var(--red); }
+    .stats { display:grid; grid-template-columns:repeat(4,minmax(140px,1fr)); gap:10px; }
+    .kpi { border:1px solid var(--line); border-radius:10px; padding:10px; background:#fff; }
+    .kpi .k { color:var(--muted); font-size:12px; }
+    .kpi .v { font-weight:700; font-size:18px; margin-top:4px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <strong>Tea Store Web Admin</strong>
+        <span id="health" class="muted">Checking backend...</span>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <input id="apiBase" placeholder="API Base URL, e.g. http://192.168.1.37:8080" />
+        <button id="saveApi" class="primary">Save</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <input id="q" placeholder="Search order_no / channel" />
+        <select id="status">
+          <option value="">All status</option>
+          <option value="paid">Paid</option>
+          <option value="partially_refunded">Partially Refunded</option>
+          <option value="refunded">Refunded</option>
+        </select>
+        <button id="refresh" class="primary">Refresh</button>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <input id="statDate" type="date" />
+        <button id="loadStat">Load Daily Stats</button>
+      </div>
+      <div class="stats">
+        <div class="kpi"><div class="k">Orders</div><div id="kOrder" class="v">-</div></div>
+        <div class="kpi"><div class="k">Gross</div><div id="kGross" class="v">-</div></div>
+        <div class="kpi"><div class="k">Refunds</div><div id="kRefund" class="v">-</div></div>
+        <div class="kpi"><div class="k">Net</div><div id="kNet" class="v">-</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="muted" id="count" style="margin-bottom:8px">Orders: 0</div>
+      <div style="overflow:auto">
+        <table>
+          <thead>
+            <tr><th>Order No</th><th>Type</th><th>Channel</th><th>Total</th><th>Status</th><th>Created At</th></tr>
+          </thead>
+          <tbody id="tbody"><tr><td colspan="6" class="muted">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="./main.js"></script>
+</body>
+</html>
