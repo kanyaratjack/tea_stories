@@ -16,15 +16,18 @@ import (
 type Store interface {
 	Ping(ctx context.Context) error
 	ListProducts(ctx context.Context) ([]model.Product, error)
-	ListOrders(ctx context.Context) ([]model.Order, error)
+	ListOrders(ctx context.Context, q model.OrderQuery) ([]model.Order, error)
 	GetOrderByNo(ctx context.Context, orderNo string) (model.Order, error)
 	CreateOrder(ctx context.Context, input model.CreateOrderInput) (model.Order, error)
 	CreateRefund(ctx context.Context, orderNo string, input model.CreateRefundInput) (model.Refund, error)
+	ListRefundsByOrderNo(ctx context.Context, orderNo string) ([]model.Refund, error)
+	DeleteOrderByNo(ctx context.Context, orderNo string) error
 	DailyStats(ctx context.Context, date time.Time) (model.DailyStats, error)
 	Close()
 }
 
 var ErrNotFound = errors.New("not_found")
+var ErrInvalidRefundAmount = errors.New("invalid_refund_amount")
 
 type PostgresStore struct {
 	pool *pgxpool.Pool
@@ -80,13 +83,55 @@ func (s *PostgresStore) ListProducts(ctx context.Context) ([]model.Product, erro
 	return items, nil
 }
 
-func (s *PostgresStore) ListOrders(ctx context.Context) ([]model.Order, error) {
-	rows, err := s.pool.Query(ctx, `
+func (s *PostgresStore) ListOrders(ctx context.Context, q model.OrderQuery) ([]model.Order, error) {
+	limit := q.Limit
+	if limit <= 0 {
+		limit = 200
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	offset := q.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	args := []any{}
+	conds := []string{}
+	addArg := func(v any) string {
+		args = append(args, v)
+		return fmt.Sprintf("$%d", len(args))
+	}
+	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
+		p := addArg("%" + keyword + "%")
+		conds = append(conds, fmt.Sprintf("(order_no ILIKE %s OR channel ILIKE %s)", p, p))
+	}
+	if status := strings.TrimSpace(q.Status); status != "" {
+		conds = append(conds, fmt.Sprintf("status = %s", addArg(status)))
+	}
+	if orderType := strings.TrimSpace(q.OrderType); orderType != "" {
+		conds = append(conds, fmt.Sprintf("order_type = %s", addArg(normalizeOrderType(orderType))))
+	}
+	if channel := strings.TrimSpace(q.Channel); channel != "" {
+		conds = append(conds, fmt.Sprintf("channel ILIKE %s", addArg("%"+channel+"%")))
+	}
+	if q.DateFrom != nil {
+		conds = append(conds, fmt.Sprintf("created_at >= %s", addArg(*q.DateFrom)))
+	}
+	if q.DateTo != nil {
+		conds = append(conds, fmt.Sprintf("created_at < %s", addArg(*q.DateTo)))
+	}
+
+	sql := `
 		SELECT order_no, order_type, COALESCE(channel, ''), total, COALESCE(status, 'paid'), created_at
 		FROM orders
-		ORDER BY created_at DESC
-		LIMIT 200
-	`)
+	`
+	if len(conds) > 0 {
+		sql += " WHERE " + strings.Join(conds, " AND ")
+	}
+	sql += fmt.Sprintf(" ORDER BY created_at DESC LIMIT %s OFFSET %s", addArg(limit), addArg(offset))
+
+	rows, err := s.pool.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -241,6 +286,32 @@ func (s *PostgresStore) CreateRefund(
 		return model.Refund{}, fmt.Errorf("%w: order_no=%s", ErrNotFound, orderNo)
 	}
 
+	var total float64
+	var refunded float64
+	if err := tx.QueryRow(
+		ctx,
+		`
+		SELECT
+		  o.total::float8,
+		  COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.order_no = o.order_no), 0)::float8
+		FROM orders o
+		WHERE o.order_no = $1
+		LIMIT 1
+		`,
+		orderNo,
+	).Scan(&total, &refunded); err != nil {
+		return model.Refund{}, err
+	}
+	remaining := total - refunded
+	if input.Amount > remaining+0.000001 {
+		return model.Refund{}, fmt.Errorf(
+			"%w: amount=%.2f remaining=%.2f",
+			ErrInvalidRefundAmount,
+			input.Amount,
+			remaining,
+		)
+	}
+
 	var refund model.Refund
 	if err := tx.QueryRow(
 		ctx,
@@ -306,6 +377,57 @@ func (s *PostgresStore) CreateRefund(
 		return model.Refund{}, err
 	}
 	return refund, nil
+}
+
+func (s *PostgresStore) ListRefundsByOrderNo(ctx context.Context, orderNo string) ([]model.Refund, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`
+		SELECT id, order_no, amount, reason, created_at
+		FROM refunds
+		WHERE order_no = $1
+		ORDER BY created_at DESC, id DESC
+		`,
+		strings.TrimSpace(orderNo),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.Refund, 0, 8)
+	for rows.Next() {
+		var refund model.Refund
+		if err := rows.Scan(
+			&refund.ID,
+			&refund.OrderNo,
+			&refund.Amount,
+			&refund.Reason,
+			&refund.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, refund)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (s *PostgresStore) DeleteOrderByNo(ctx context.Context, orderNo string) error {
+	cmdTag, err := s.pool.Exec(
+		ctx,
+		`DELETE FROM orders WHERE order_no = $1`,
+		strings.TrimSpace(orderNo),
+	)
+	if err != nil {
+		return err
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *PostgresStore) getOrderByIdempotencyKey(

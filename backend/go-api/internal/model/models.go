@@ -22,6 +22,17 @@ type Order struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type OrderQuery struct {
+	Keyword   string
+	Status    string
+	OrderType string
+	Channel   string
+	DateFrom  *time.Time
+	DateTo    *time.Time
+	Limit     int
+	Offset    int
+}
+
 type CreateOrderInput struct {
 	OrderNo        string     `json:"order_no,omitempty"`
 	OrderType      string     `json:"order_type"`

@@ -28,8 +28,8 @@ func (s *POSService) Products(ctx context.Context) ([]model.Product, error) {
 	return s.store.ListProducts(ctx)
 }
 
-func (s *POSService) Orders(ctx context.Context) ([]model.Order, error) {
-	return s.store.ListOrders(ctx)
+func (s *POSService) Orders(ctx context.Context, q model.OrderQuery) ([]model.Order, error) {
+	return s.store.ListOrders(ctx, q)
 }
 
 func (s *POSService) OrderByNo(ctx context.Context, orderNo string) (model.Order, error) {
@@ -49,6 +49,14 @@ func (s *POSService) CreateRefund(
 	input model.CreateRefundInput,
 ) (model.Refund, error) {
 	return s.store.CreateRefund(ctx, orderNo, input)
+}
+
+func (s *POSService) RefundsByOrderNo(ctx context.Context, orderNo string) ([]model.Refund, error) {
+	return s.store.ListRefundsByOrderNo(ctx, orderNo)
+}
+
+func (s *POSService) DeleteOrderByNo(ctx context.Context, orderNo string) error {
+	return s.store.DeleteOrderByNo(ctx, orderNo)
 }
 
 func (s *POSService) DailyStats(

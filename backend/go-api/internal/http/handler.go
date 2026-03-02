@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -49,8 +50,10 @@ func (h *Handler) handleRoot(w http.ResponseWriter, _ *http.Request) {
 			"GET /api/v1/products",
 			"GET /api/v1/orders",
 			"GET /api/v1/orders/{orderNo}",
+			"GET /api/v1/orders/{orderNo}/refunds",
 			"POST /api/v1/orders",
 			"POST /api/v1/orders/{orderNo}/refunds",
+			"DELETE /api/v1/orders/{orderNo}",
 			"GET /api/v1/stats/daily?date=YYYY-MM-DD",
 		},
 	})
@@ -86,7 +89,15 @@ func (h *Handler) handleOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleListOrders(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.Orders(r.Context())
+	query, err := parseOrderQuery(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	items, err := h.svc.Orders(r.Context(), query)
 	if err != nil {
 		log.Printf("list orders failed: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]any{
@@ -129,21 +140,36 @@ func (h *Handler) handleOrderActions(w http.ResponseWriter, r *http.Request) {
 	path := orderActionPath(r.URL.Path)
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) == 1 && parts[0] != "" {
-		h.handleGetOrderByNo(w, r, parts[0])
+		switch r.Method {
+		case http.MethodGet:
+			h.handleGetOrderByNo(w, r, parts[0])
+		case http.MethodDelete:
+			h.handleDeleteOrderByNo(w, r, parts[0])
+		default:
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
+				"error": "method_not_allowed",
+			})
+		}
 		return
 	}
-	if len(parts) != 2 || parts[0] == "" || parts[1] != "refunds" {
+	if len(parts) != 2 || parts[0] == "" {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "not_found"})
 		return
 	}
 	orderNo := parts[0]
-	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
-			"error": "method_not_allowed",
-		})
+	switch {
+	case parts[1] == "refunds" && r.Method == http.MethodGet:
+		h.handleListRefundsByOrderNo(w, r, orderNo)
 		return
+	case parts[1] == "refunds" && r.Method == http.MethodPost:
+		h.handleCreateRefund(w, r, orderNo)
+		return
+	default:
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "not_found"})
 	}
+}
 
+func (h *Handler) handleCreateRefund(w http.ResponseWriter, r *http.Request, orderNo string) {
 	var input model.CreateRefundInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
@@ -167,6 +193,12 @@ func (h *Handler) handleOrderActions(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		if errors.Is(err, repo.ErrInvalidRefundAmount) {
+			writeJSON(w, http.StatusConflict, map[string]any{
+				"error": "refund_amount_exceeds_remaining",
+			})
+			return
+		}
 		writeJSON(w, http.StatusInternalServerError, map[string]any{
 			"error": "failed_to_create_refund",
 		})
@@ -175,13 +207,33 @@ func (h *Handler) handleOrderActions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, refund)
 }
 
-func (h *Handler) handleGetOrderByNo(w http.ResponseWriter, r *http.Request, orderNo string) {
-	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
-			"error": "method_not_allowed",
+func (h *Handler) handleListRefundsByOrderNo(w http.ResponseWriter, r *http.Request, orderNo string) {
+	_, err := h.svc.OrderByNo(r.Context(), orderNo)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, map[string]any{
+				"error": "order_not_found",
+			})
+			return
+		}
+		log.Printf("get order for refunds failed: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"error": "failed_to_get_refunds",
 		})
 		return
 	}
+	items, err := h.svc.RefundsByOrderNo(r.Context(), orderNo)
+	if err != nil {
+		log.Printf("list refunds failed: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"error": "failed_to_get_refunds",
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (h *Handler) handleGetOrderByNo(w http.ResponseWriter, r *http.Request, orderNo string) {
 	order, err := h.svc.OrderByNo(r.Context(), orderNo)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
@@ -199,11 +251,70 @@ func (h *Handler) handleGetOrderByNo(w http.ResponseWriter, r *http.Request, ord
 	writeJSON(w, http.StatusOK, order)
 }
 
+func (h *Handler) handleDeleteOrderByNo(w http.ResponseWriter, r *http.Request, orderNo string) {
+	if err := h.svc.DeleteOrderByNo(r.Context(), orderNo); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, map[string]any{
+				"error": "order_not_found",
+			})
+			return
+		}
+		log.Printf("delete order failed: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"error": "failed_to_delete_order",
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok": true,
+	})
+}
+
 func orderActionPath(rawPath string) string {
 	if strings.HasPrefix(rawPath, "/api/v1/orders/") {
 		return strings.TrimPrefix(rawPath, "/api/v1/orders/")
 	}
 	return strings.TrimPrefix(rawPath, "/api/orders/")
+}
+
+func parseOrderQuery(r *http.Request) (model.OrderQuery, error) {
+	q := model.OrderQuery{
+		Keyword:   strings.TrimSpace(r.URL.Query().Get("keyword")),
+		Status:    strings.TrimSpace(r.URL.Query().Get("status")),
+		OrderType: strings.TrimSpace(r.URL.Query().Get("order_type")),
+		Channel:   strings.TrimSpace(r.URL.Query().Get("channel")),
+		Limit:     200,
+		Offset:    0,
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("page_size")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			return model.OrderQuery{}, errors.New("invalid_page_size")
+		}
+		q.Limit = n
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("page")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			return model.OrderQuery{}, errors.New("invalid_page")
+		}
+		q.Offset = (n - 1) * q.Limit
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("from")); v != "" {
+		ts, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return model.OrderQuery{}, errors.New("invalid_from")
+		}
+		q.DateFrom = &ts
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("to")); v != "" {
+		ts, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return model.OrderQuery{}, errors.New("invalid_to")
+		}
+		q.DateTo = &ts
+	}
+	return q, nil
 }
 
 func (h *Handler) handleDailyStats(w http.ResponseWriter, r *http.Request) {
