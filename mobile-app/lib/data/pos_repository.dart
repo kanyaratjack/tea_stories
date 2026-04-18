@@ -1138,20 +1138,15 @@ class PosRepository {
   }
 
   Future<List<DailyRevenueStat>> fetchDailyRevenueStats({
-    required int days,
+    int days = 30,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
-    final allTime = days <= 0;
-    final today = DateTime.now();
-    final start = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).subtract(Duration(days: (days <= 0 ? 1 : days) - 1));
-    final end = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).add(const Duration(days: 1));
+    final filter = _resolveStatsDateFilter(
+      days: days,
+      startDate: startDate,
+      endDate: endDate,
+    );
 
     final rows = await db.rawQuery(
       '''
@@ -1176,7 +1171,7 @@ class PosRepository {
           GROUP BY order_no
         ) r ON r.order_no = o.order_no
         WHERE o.status IN (?, ?, ?)
-          ${allTime ? '' : 'AND o.created_at >= ? AND o.created_at < ?'}
+          ${filter.whereClause}
       ) t
       GROUP BY t.day
       ORDER BY t.day DESC
@@ -1185,29 +1180,23 @@ class PosRepository {
         'paid',
         'partially_refunded',
         'refunded',
-        if (!allTime) start.toIso8601String(),
-        if (!allTime) end.toIso8601String(),
+        ...filter.arguments,
       ],
     );
     return rows.map(DailyRevenueStat.fromMap).toList(growable: false);
   }
 
   Future<List<ProductSalesStat>> fetchTopProductSalesStats({
-    required int days,
+    int days = 30,
+    DateTime? startDate,
+    DateTime? endDate,
     int limit = 10,
   }) async {
-    final allTime = days <= 0;
-    final today = DateTime.now();
-    final start = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).subtract(Duration(days: (days <= 0 ? 1 : days) - 1));
-    final end = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).add(const Duration(days: 1));
+    final filter = _resolveStatsDateFilter(
+      days: days,
+      startDate: startDate,
+      endDate: endDate,
+    );
 
     final rows = await db.rawQuery(
       '''
@@ -1234,7 +1223,7 @@ class PosRepository {
         JOIN orders o ON o.id = oi.order_id
         LEFT JOIN refund_items ri ON ri.order_item_id = oi.id
         WHERE o.status IN (?, ?, ?)
-          ${allTime ? '' : 'AND o.created_at >= ? AND o.created_at < ?'}
+          ${filter.whereClause}
         GROUP BY oi.id, oi.product_name, oi.quantity, oi.line_total
       ) p
       GROUP BY p.product_name
@@ -1245,8 +1234,7 @@ class PosRepository {
         'paid',
         'partially_refunded',
         'refunded',
-        if (!allTime) start.toIso8601String(),
-        if (!allTime) end.toIso8601String(),
+        ...filter.arguments,
         limit,
       ],
     );
@@ -1254,20 +1242,15 @@ class PosRepository {
   }
 
   Future<List<PaymentMethodStat>> fetchPaymentMethodStats({
-    required int days,
+    int days = 30,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
-    final allTime = days <= 0;
-    final today = DateTime.now();
-    final start = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).subtract(Duration(days: (days <= 0 ? 1 : days) - 1));
-    final end = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).add(const Duration(days: 1));
+    final filter = _resolveStatsDateFilter(
+      days: days,
+      startDate: startDate,
+      endDate: endDate,
+    );
 
     final rows = await db.rawQuery(
       '''
@@ -1291,7 +1274,7 @@ class PosRepository {
           GROUP BY order_no
         ) r ON r.order_no = o.order_no
         WHERE o.status IN (?, ?, ?)
-          ${allTime ? '' : 'AND o.created_at >= ? AND o.created_at < ?'}
+          ${filter.whereClause}
       ) t
       GROUP BY t.payment_method
       ORDER BY net_amount DESC, order_count DESC
@@ -1300,26 +1283,22 @@ class PosRepository {
         'paid',
         'partially_refunded',
         'refunded',
-        if (!allTime) start.toIso8601String(),
-        if (!allTime) end.toIso8601String(),
+        ...filter.arguments,
       ],
     );
     return rows.map(PaymentMethodStat.fromMap).toList(growable: false);
   }
 
-  Future<List<OrderTypeStat>> fetchOrderTypeStats({required int days}) async {
-    final allTime = days <= 0;
-    final today = DateTime.now();
-    final start = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).subtract(Duration(days: (days <= 0 ? 1 : days) - 1));
-    final end = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).add(const Duration(days: 1));
+  Future<List<OrderTypeStat>> fetchOrderTypeStats({
+    int days = 30,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final filter = _resolveStatsDateFilter(
+      days: days,
+      startDate: startDate,
+      endDate: endDate,
+    );
 
     final rows = await db.rawQuery(
       '''
@@ -1343,7 +1322,7 @@ class PosRepository {
           GROUP BY order_no
         ) r ON r.order_no = o.order_no
         WHERE o.status IN (?, ?, ?)
-          ${allTime ? '' : 'AND o.created_at >= ? AND o.created_at < ?'}
+          ${filter.whereClause}
       ) t
       GROUP BY t.order_type
       ORDER BY net_amount DESC, order_count DESC
@@ -1352,28 +1331,22 @@ class PosRepository {
         'paid',
         'partially_refunded',
         'refunded',
-        if (!allTime) start.toIso8601String(),
-        if (!allTime) end.toIso8601String(),
+        ...filter.arguments,
       ],
     );
     return rows.map(OrderTypeStat.fromMap).toList(growable: false);
   }
 
   Future<List<DeliveryChannelStat>> fetchDeliveryChannelStats({
-    required int days,
+    int days = 30,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
-    final allTime = days <= 0;
-    final today = DateTime.now();
-    final start = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).subtract(Duration(days: (days <= 0 ? 1 : days) - 1));
-    final end = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).add(const Duration(days: 1));
+    final filter = _resolveStatsDateFilter(
+      days: days,
+      startDate: startDate,
+      endDate: endDate,
+    );
 
     final rows = await db.rawQuery(
       '''
@@ -1395,7 +1368,7 @@ class PosRepository {
         WHERE o.order_type = 'delivery'
           AND o.status IN (?, ?, ?)
           AND TRIM(COALESCE(o.order_channel, '')) != ''
-          ${allTime ? '' : 'AND o.created_at >= ? AND o.created_at < ?'}
+          ${filter.whereClause}
       ) t
       GROUP BY t.order_channel
       ORDER BY net_amount DESC, order_count DESC
@@ -1404,16 +1377,17 @@ class PosRepository {
         'paid',
         'partially_refunded',
         'refunded',
-        if (!allTime) start.toIso8601String(),
-        if (!allTime) end.toIso8601String(),
+        ...filter.arguments,
       ],
     );
     return rows.map(DeliveryChannelStat.fromMap).toList(growable: false);
   }
 
-  Future<List<HourlyRevenueStat>> fetchTodayHourlyRevenueStats() async {
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day);
+  Future<List<HourlyRevenueStat>> fetchHourlyRevenueStats({
+    DateTime? date,
+  }) async {
+    final target = date ?? DateTime.now();
+    final start = DateTime(target.year, target.month, target.day);
     final end = start.add(const Duration(days: 1));
     final rows = await db.rawQuery(
       '''
@@ -1447,6 +1421,38 @@ class PosRepository {
       ],
     );
     return rows.map(HourlyRevenueStat.fromMap).toList(growable: false);
+  }
+
+  _StatsDateFilter _resolveStatsDateFilter({
+    required int days,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
+    if (startDate != null && endDate != null) {
+      final start = DateTime(startDate.year, startDate.month, startDate.day);
+      final endExclusive = DateTime(
+        endDate.year,
+        endDate.month,
+        endDate.day,
+      ).add(const Duration(days: 1));
+      return _StatsDateFilter(
+        whereClause: 'AND o.created_at >= ? AND o.created_at < ?',
+        arguments: [start.toIso8601String(), endExclusive.toIso8601String()],
+      );
+    }
+
+    if (days <= 0) {
+      return const _StatsDateFilter(whereClause: '', arguments: []);
+    }
+
+    final today = DateTime.now();
+    final end = DateTime(today.year, today.month, today.day)
+        .add(const Duration(days: 1));
+    final start = end.subtract(Duration(days: days));
+    return _StatsDateFilter(
+      whereClause: 'AND o.created_at >= ? AND o.created_at < ?',
+      arguments: [start.toIso8601String(), end.toIso8601String()],
+    );
   }
 
   Future<OrderDetail> fetchOrderDetail(String orderNo) async {
@@ -1945,4 +1951,14 @@ class PosRepository {
     final ss = now.second.toString().padLeft(2, '0');
     return 'H$y$m$d-$hh$mm$ss';
   }
+}
+
+class _StatsDateFilter {
+  const _StatsDateFilter({
+    required this.whereClause,
+    required this.arguments,
+  });
+
+  final String whereClause;
+  final List<Object> arguments;
 }

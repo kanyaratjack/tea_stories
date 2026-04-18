@@ -127,9 +127,20 @@ class AppI18n {
   String get loadingMore => _t('loadingMore');
   String get orderDetails => _t('orderDetails');
   String get recentDays => _t('recentDays');
+  String get dateRange => _t('dateRange');
+  String get customRange => _t('customRange');
+  String get startDate => _t('startDate');
+  String get endDate => _t('endDate');
+  String get selectDate => _t('selectDate');
+  String get invalidDateRange => _t('invalidDateRange');
+  String get last7Days => _t('last7Days');
+  String get last30Days => _t('last30Days');
+  String get last180Days => _t('last180Days');
+  String get last365Days => _t('last365Days');
   String get allTime => _t('allTime');
   String get today => _t('today');
   String get dailyRevenue => _t('dailyRevenue');
+  String get hourlyRevenue => _t('hourlyRevenue');
   String get grossRevenue => _t('grossRevenue');
   String get netRevenue => _t('netRevenue');
   String get topProducts => _t('topProducts');
@@ -423,9 +434,20 @@ class AppI18n {
       'loadingMore': 'กำลังโหลด...',
       'orderDetails': 'รายละเอียดออเดอร์',
       'recentDays': 'ย้อนหลัง',
+      'dateRange': 'ช่วงวันที่',
+      'customRange': 'กำหนดเอง',
+      'startDate': 'วันที่เริ่ม',
+      'endDate': 'วันที่สิ้นสุด',
+      'selectDate': 'เลือกวันที่',
+      'invalidDateRange': 'วันที่เริ่มต้องไม่ช้ากว่าวันที่สิ้นสุด',
+      'last7Days': '7 วันที่ผ่านมา',
+      'last30Days': '30 วันที่ผ่านมา',
+      'last180Days': '180 วันที่ผ่านมา',
+      'last365Days': '365 วันที่ผ่านมา',
       'allTime': 'ทั้งหมด',
       'today': 'วันนี้',
       'dailyRevenue': 'รายได้รายวัน',
+      'hourlyRevenue': 'รายได้รายชั่วโมง',
       'grossRevenue': 'ยอดขายรวม',
       'netRevenue': 'รายได้สุทธิ',
       'topProducts': 'สินค้าขายดี',
@@ -608,9 +630,20 @@ class AppI18n {
       'loadingMore': '加载中...',
       'orderDetails': '订单详情',
       'recentDays': '最近天数',
+      'dateRange': '日期范围',
+      'customRange': '自定义',
+      'startDate': '开始日期',
+      'endDate': '结束日期',
+      'selectDate': '选择日期',
+      'invalidDateRange': '开始日期不能晚于结束日期',
+      'last7Days': '近 7 天',
+      'last30Days': '近 30 天',
+      'last180Days': '近 180 天',
+      'last365Days': '近 365 天',
       'allTime': '全部',
       'today': '当天',
       'dailyRevenue': '每日收入',
+      'hourlyRevenue': '每小时收入',
       'grossRevenue': '总销售额',
       'netRevenue': '净收入',
       'topProducts': '热销商品',
@@ -794,9 +827,20 @@ class AppI18n {
       'loadingMore': 'Loading...',
       'orderDetails': 'Order details',
       'recentDays': 'Recent days',
+      'dateRange': 'Date range',
+      'customRange': 'Custom',
+      'startDate': 'Start date',
+      'endDate': 'End date',
+      'selectDate': 'Select date',
+      'invalidDateRange': 'Start date cannot be after end date',
+      'last7Days': 'Last 7 days',
+      'last30Days': 'Last 30 days',
+      'last180Days': 'Last 180 days',
+      'last365Days': 'Last 365 days',
       'allTime': 'All',
       'today': 'Today',
       'dailyRevenue': 'Daily revenue',
+      'hourlyRevenue': 'Hourly revenue',
       'grossRevenue': 'Gross revenue',
       'netRevenue': 'Net revenue',
       'topProducts': 'Top products',

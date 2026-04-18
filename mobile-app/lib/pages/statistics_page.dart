@@ -20,7 +20,9 @@ class StatisticsPage extends StatefulWidget {
 }
 
 class _StatisticsPageState extends State<StatisticsPage> {
-  int _days = 0;
+  _StatsPreset _preset = _StatsPreset.all;
+  DateTime? _customStartDate;
+  DateTime? _customEndDate;
   late Future<_StatsViewData> _future;
 
   @override
@@ -30,27 +32,127 @@ class _StatisticsPageState extends State<StatisticsPage> {
   }
 
   Future<_StatsViewData> _load() async {
-    final daily = await widget.controller.loadDailyRevenueStats(days: _days);
+    final range = _selectedRange;
+    final daily = await widget.controller.loadDailyRevenueStats(
+      days: range.days,
+      startDate: range.startDate,
+      endDate: range.endDate,
+    );
     final top = await widget.controller.loadTopProductSalesStats(
-      days: _days,
+      days: range.days,
+      startDate: range.startDate,
+      endDate: range.endDate,
       limit: 10,
     );
     final paymentMethods = await widget.controller.loadPaymentMethodStats(
-      days: _days,
+      days: range.days,
+      startDate: range.startDate,
+      endDate: range.endDate,
     );
-    final orderTypes = await widget.controller.loadOrderTypeStats(days: _days);
+    final orderTypes = await widget.controller.loadOrderTypeStats(
+      days: range.days,
+      startDate: range.startDate,
+      endDate: range.endDate,
+    );
     final deliveryChannels = await widget.controller.loadDeliveryChannelStats(
-      days: _days,
+      days: range.days,
+      startDate: range.startDate,
+      endDate: range.endDate,
     );
-    final hourlyToday = await widget.controller.loadTodayHourlyRevenueStats();
+    final hourlyRevenue = await widget.controller.loadHourlyRevenueStats(
+      date: range.anchorDate,
+    );
     return _StatsViewData(
       daily: daily,
       topProducts: top,
       paymentMethods: paymentMethods,
       orderTypes: orderTypes,
       deliveryChannels: deliveryChannels,
-      hourlyToday: hourlyToday,
+      hourlyRevenue: hourlyRevenue,
     );
+  }
+
+  _StatsRange get _selectedRange {
+    return switch (_preset) {
+      _StatsPreset.today => _StatsRange(days: 1),
+      _StatsPreset.last7Days => _StatsRange(days: 7),
+      _StatsPreset.last30Days => _StatsRange(days: 30),
+      _StatsPreset.last180Days => _StatsRange(days: 180),
+      _StatsPreset.last365Days => _StatsRange(days: 365),
+      _StatsPreset.all => const _StatsRange(days: 0),
+      _StatsPreset.custom => _StatsRange(
+        days: 0,
+        startDate: _customStartDate,
+        endDate: _customEndDate,
+      ),
+    };
+  }
+
+  Future<void> _pickDate({required bool isStart}) async {
+    final now = DateTime.now();
+    final initialDate = (isStart ? _customStartDate : _customEndDate) ?? now;
+    final picked = await showDatePicker(
+      context: context,
+      locale: widget.i18n.locale,
+      initialDate: initialDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (picked == null || !mounted) return;
+
+    final normalized = DateTime(picked.year, picked.month, picked.day);
+    setState(() {
+      if (isStart) {
+        _customStartDate = normalized;
+        _customEndDate ??= normalized;
+      } else {
+        _customEndDate = normalized;
+        _customStartDate ??= normalized;
+      }
+    });
+  }
+
+  void _applyCustomRange() {
+    final i18n = widget.i18n;
+    final start = _customStartDate;
+    final end = _customEndDate;
+    if (start == null || end == null) return;
+    if (start.isAfter(end)) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(i18n.invalidDateRange)));
+      return;
+    }
+    _reload();
+  }
+
+  String _presetLabel(AppI18n i18n, _StatsPreset preset) {
+    return switch (preset) {
+      _StatsPreset.today => i18n.today,
+      _StatsPreset.last7Days => i18n.last7Days,
+      _StatsPreset.last30Days => i18n.last30Days,
+      _StatsPreset.last180Days => i18n.last180Days,
+      _StatsPreset.last365Days => i18n.last365Days,
+      _StatsPreset.all => i18n.allTime,
+      _StatsPreset.custom => i18n.customRange,
+    };
+  }
+
+  String _formatDate(DateTime date) {
+    return DateFormat('yyyy-MM-dd').format(date);
+  }
+
+  String _rangeSummary(AppI18n i18n) {
+    final range = _selectedRange;
+    if (range.startDate != null && range.endDate != null) {
+      return '${_formatDate(range.startDate!)} - ${_formatDate(range.endDate!)}';
+    }
+    return _presetLabel(i18n, _preset);
+  }
+
+  String _hourlySummary() {
+    final anchor = _selectedRange.anchorDate ?? DateTime.now();
+    return _formatDate(anchor);
   }
 
   void _reload() {
@@ -100,38 +202,61 @@ class _StatisticsPageState extends State<StatisticsPage> {
                   runSpacing: 10,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text(i18n.recentDays),
+                    Text(i18n.dateRange),
                     SizedBox(
-                      width: 140,
-                      child: DropdownButtonFormField<int>(
-                        initialValue: _days,
+                      width: 180,
+                      child: DropdownButtonFormField<_StatsPreset>(
+                        initialValue: _preset,
                         decoration: const InputDecoration(
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
-                        items: const [0, 1, 30, 180, 365]
+                        items: _StatsPreset.values
                             .map(
-                              (d) => DropdownMenuItem(
-                                value: d,
-                                child: Text(
-                                  d == 0
-                                      ? i18n.allTime
-                                      : d == 1
-                                      ? i18n.today
-                                      : '$d',
-                                ),
+                              (preset) => DropdownMenuItem(
+                                value: preset,
+                                child: Text(_presetLabel(i18n, preset)),
                               ),
                             )
                             .toList(growable: false),
                         onChanged: (value) {
                           if (value == null) return;
                           setState(() {
-                            _days = value;
-                            _future = _load();
+                            _preset = value;
+                            if (value != _StatsPreset.custom) {
+                              _future = _load();
+                            } else {
+                              _customStartDate ??= DateTime.now();
+                              _customEndDate ??= DateTime.now();
+                            }
                           });
                         },
                       ),
                     ),
+                    if (_preset == _StatsPreset.custom) ...[
+                      OutlinedButton.icon(
+                        onPressed: () => _pickDate(isStart: true),
+                        icon: const Icon(Icons.date_range),
+                        label: Text(
+                          _customStartDate == null
+                              ? i18n.startDate
+                              : _formatDate(_customStartDate!),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _pickDate(isStart: false),
+                        icon: const Icon(Icons.event),
+                        label: Text(
+                          _customEndDate == null
+                              ? i18n.endDate
+                              : _formatDate(_customEndDate!),
+                        ),
+                      ),
+                      FilledButton(
+                        onPressed: _applyCustomRange,
+                        child: Text(i18n.confirm),
+                      ),
+                    ],
                     OutlinedButton.icon(
                       onPressed: _reload,
                       icon: const Icon(Icons.refresh),
@@ -139,10 +264,22 @@ class _StatisticsPageState extends State<StatisticsPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  '${i18n.dateRange}: ${_rangeSummary(i18n)}',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 _SummaryCards(i18n: i18n, data: data),
                 const SizedBox(height: 12),
-                _HourlyRevenueChart(i18n: i18n, data: data.hourlyToday),
+                _HourlyRevenueChart(
+                  i18n: i18n,
+                  data: data.hourlyRevenue,
+                  titleSuffix: _hourlySummary(),
+                ),
                 const SizedBox(height: 12),
                 _DailyRevenueList(i18n: i18n, data: data.daily),
                 const SizedBox(height: 12),
@@ -546,10 +683,15 @@ class _DeliveryChannelList extends StatelessWidget {
 }
 
 class _HourlyRevenueChart extends StatelessWidget {
-  const _HourlyRevenueChart({required this.i18n, required this.data});
+  const _HourlyRevenueChart({
+    required this.i18n,
+    required this.data,
+    required this.titleSuffix,
+  });
 
   final AppI18n i18n;
   final List<HourlyRevenueStat> data;
+  final String titleSuffix;
 
   @override
   Widget build(BuildContext context) {
@@ -580,7 +722,7 @@ class _HourlyRevenueChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            t('今日时段销售额', 'ยอดขายรายชั่วโมงวันนี้', 'Today Hourly Revenue'),
+            '${i18n.hourlyRevenue} ($titleSuffix)',
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 6),
@@ -671,7 +813,7 @@ class _StatsViewData {
     required this.paymentMethods,
     required this.orderTypes,
     required this.deliveryChannels,
-    required this.hourlyToday,
+    required this.hourlyRevenue,
   });
 
   final List<DailyRevenueStat> daily;
@@ -679,11 +821,35 @@ class _StatsViewData {
   final List<PaymentMethodStat> paymentMethods;
   final List<OrderTypeStat> orderTypes;
   final List<DeliveryChannelStat> deliveryChannels;
-  final List<HourlyRevenueStat> hourlyToday;
+  final List<HourlyRevenueStat> hourlyRevenue;
 
   double get grossTotal => daily.fold(0, (sum, item) => sum + item.grossAmount);
   double get promoTotal => daily.fold(0, (sum, item) => sum + item.promoAmount);
   double get refundedTotal =>
       daily.fold(0, (sum, item) => sum + item.refundedAmount);
   double get netTotal => daily.fold(0, (sum, item) => sum + item.netAmount);
+}
+
+enum _StatsPreset {
+  today,
+  last7Days,
+  last30Days,
+  last180Days,
+  last365Days,
+  all,
+  custom,
+}
+
+class _StatsRange {
+  const _StatsRange({
+    required this.days,
+    this.startDate,
+    this.endDate,
+  });
+
+  final int days;
+  final DateTime? startDate;
+  final DateTime? endDate;
+
+  DateTime? get anchorDate => endDate ?? startDate;
 }

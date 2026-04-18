@@ -1308,31 +1308,70 @@ class PosController extends ChangeNotifier {
     return amount;
   }
 
-  Future<List<DailyRevenueStat>> loadDailyRevenueStats({int days = 30}) {
-    return repository.fetchDailyRevenueStats(days: days);
+  Future<List<DailyRevenueStat>> loadDailyRevenueStats({
+    int days = 30,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
+    return repository.fetchDailyRevenueStats(
+      days: days,
+      startDate: startDate,
+      endDate: endDate,
+    );
   }
 
   Future<List<ProductSalesStat>> loadTopProductSalesStats({
     int days = 30,
+    DateTime? startDate,
+    DateTime? endDate,
     int limit = 10,
   }) {
-    return repository.fetchTopProductSalesStats(days: days, limit: limit);
+    return repository.fetchTopProductSalesStats(
+      days: days,
+      startDate: startDate,
+      endDate: endDate,
+      limit: limit,
+    );
   }
 
-  Future<List<PaymentMethodStat>> loadPaymentMethodStats({int days = 30}) {
-    return repository.fetchPaymentMethodStats(days: days);
+  Future<List<PaymentMethodStat>> loadPaymentMethodStats({
+    int days = 30,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
+    return repository.fetchPaymentMethodStats(
+      days: days,
+      startDate: startDate,
+      endDate: endDate,
+    );
   }
 
-  Future<List<OrderTypeStat>> loadOrderTypeStats({int days = 30}) {
-    return repository.fetchOrderTypeStats(days: days);
+  Future<List<OrderTypeStat>> loadOrderTypeStats({
+    int days = 30,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
+    return repository.fetchOrderTypeStats(
+      days: days,
+      startDate: startDate,
+      endDate: endDate,
+    );
   }
 
-  Future<List<DeliveryChannelStat>> loadDeliveryChannelStats({int days = 30}) {
-    return repository.fetchDeliveryChannelStats(days: days);
+  Future<List<DeliveryChannelStat>> loadDeliveryChannelStats({
+    int days = 30,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
+    return repository.fetchDeliveryChannelStats(
+      days: days,
+      startDate: startDate,
+      endDate: endDate,
+    );
   }
 
-  Future<List<HourlyRevenueStat>> loadTodayHourlyRevenueStats() {
-    return repository.fetchTodayHourlyRevenueStats();
+  Future<List<HourlyRevenueStat>> loadHourlyRevenueStats({DateTime? date}) {
+    return repository.fetchHourlyRevenueStats(date: date);
   }
 
   Future<HistoricalSyncReport> syncHistoricalOrdersToBackend({
